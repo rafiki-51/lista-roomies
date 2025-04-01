@@ -23,6 +23,7 @@ import {
 } from "firebase/firestore";
 
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import LandingPage from "./LandingPage"; // 👈 agregá esto arriba con tus imports
 
 // -------------------- COMPONENTE PRINCIPAL --------------------
 function App() {
@@ -488,15 +489,19 @@ function ListaCompartida() {
 
 
 // -------------------- MAIN APP (rutas) --------------------
+
+
 function MainApp() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/lista/:uid" element={<ListaCompartida />} />
+        <Route path="/" element={<LandingPage />} />        {/* Nueva landing */}
+        <Route path="/app" element={<App />} />             {/* App con login */}
+        <Route path="/lista/:uid" element={<ListaCompartida />} /> {/* Vista colaborativa */}
       </Routes>
     </Router>
   );
 }
+
 
 export default MainApp;
