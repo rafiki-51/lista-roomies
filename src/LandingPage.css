@@ -289,8 +289,15 @@ li.eliminando {
 }
 
 .landing-container {
-  max-width: 500px;
-  margin: 0 auto;
-  padding: 40px 20px;
-  animation: fadeIn 0.6s ease-in-out;
+  text-align: center;
+  padding: 50px;
 }
+
+.landing-container button {
+  display: block;         /* Hace que el botón se comporte como un bloque */
+  margin: 10px auto;      /* Lo centra horizontalmente y agrega espacio vertical */
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
