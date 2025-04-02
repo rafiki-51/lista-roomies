@@ -4,11 +4,12 @@ import {
   Routes,
   Route,
   useParams,
+  useNavigate,
 } from "react-router-dom";
 import Producto from "./Producto";
 import "./App.css";
 
-import db, { auth, googleProvider } from "./firebase"; // unificá todo lo que viene de firebase.js
+import db, { auth, googleProvider } from "./firebase";
 
 import {
   collection,
@@ -19,14 +20,17 @@ import {
   deleteDoc,
   query,
   where,
-  getDocs, // 👈 incluí este aquí para evitar la doble línea
+  getDocs,
 } from "firebase/firestore";
 
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import LandingPage from "./LandingPage"; // 👈 agregá esto arriba con tus imports
+import LandingPage from "./LandingPage";
+import LoginEmail from "./LoginEmail";
 
 // -------------------- COMPONENTE PRINCIPAL --------------------
 function App() {
+  const navigate = useNavigate(); // ✅ Para redirigir al cerrar sesión
+
   const [historial, setHistorial] = useState([]);
   const [productos, setProductos] = useState([]);
   const [nuevoProducto, setNuevoProducto] = useState("");
@@ -36,13 +40,12 @@ function App() {
   );
   const [productoEliminando, setProductoEliminando] = useState(null);
   const [alerta, setAlerta] = useState(null);
+  const [historialBorrando, setHistorialBorrando] = useState(false);
+  const [errorInput, setErrorInput] = useState("");
+
   const toggleTema = () => {
     setTemaOscuro(!temaOscuro);
   };
-
-  const [historialBorrando, setHistorialBorrando] = useState(false);
-
-  const [errorInput, setErrorInput] = useState(""); // Para mensaje visual debajo del input
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
@@ -67,13 +70,14 @@ function App() {
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
-        // Si no existe la lista, la creamos
         const nuevaLista = await addDoc(collection(db, "listas"), {
           uid: usuario.uid,
         });
+        localStorage.setItem("listaId", nuevaLista.id);
         escucharProductos(nuevaLista.id);
       } else {
         const listaExistente = snapshot.docs[0];
+        localStorage.setItem("listaId", listaExistente.id);
         escucharProductos(listaExistente.id);
       }
     };
@@ -88,17 +92,13 @@ function App() {
           id: doc.id,
           ...doc.data(),
         }));
-        setProductos(lista);
+        setProductos(lista.reverse());
       });
-
-      // También guardamos el ID de la lista en localStorage (opcional)
-      localStorage.setItem("listaId", idLista);
     };
 
     obtenerListaId();
   }, [usuario]);
 
-  // ✅ CORRECTO: este es el useEffect para escuchar historial
   useEffect(() => {
     const listaId = localStorage.getItem("listaId");
     if (!listaId) return;
@@ -120,18 +120,25 @@ function App() {
     return () => unsub();
   }, []);
 
+  const eliminarHistorialItem = async (id) => {
+    try {
+      await deleteDoc(doc(db, "historial", id));
+      mostrarAlerta("Producto eliminado del historial 🗑️", "success");
+    } catch (error) {
+      mostrarAlerta("Error al eliminar historial ❌", "error");
+    }
+  };
+
   const agregarProducto = async (e) => {
     e.preventDefault();
     const nombreLimpio = nuevoProducto.trim();
 
-    // ⚠️ Validación 1: No vacío ni solo espacios
     if (!nombreLimpio) {
       setErrorInput("Por favor, escribe un nombre válido.");
       setNuevoProducto("");
       return;
     }
 
-    // ⚠️ Validación 3: solo letras y espacios
     const soloLetras = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
     if (!soloLetras.test(nombreLimpio)) {
       mostrarAlerta("Solo se permiten letras y espacios.", "error");
@@ -139,14 +146,12 @@ function App() {
       return;
     }
 
-    // ⚠️ Validación 2: mínimo 3 caracteres
     if (nombreLimpio.length < 3) {
       mostrarAlerta("El nombre debe tener al menos 3 letras.", "error");
       setNuevoProducto("");
       return;
     }
 
-    // ⚠️ Validación 2: Límite de caracteres
     if (nombreLimpio.length > 30) {
       mostrarAlerta("Máximo 30 caracteres por producto.", "error");
       setNuevoProducto("");
@@ -154,8 +159,6 @@ function App() {
     }
 
     const nombreMinuscula = nombreLimpio.toLowerCase();
-
-    // ⚠️ Validación 3: No duplicados
     const yaExiste = productos.some(
       (p) => p.nombre.trim().toLowerCase() === nombreMinuscula
     );
@@ -167,7 +170,6 @@ function App() {
       return;
     }
 
-    // ✅ Si pasa todo, lo agregamos
     const listaId = localStorage.getItem("listaId");
 
     await addDoc(collection(db, "productos"), {
@@ -196,27 +198,27 @@ function App() {
   };
 
   const eliminarProducto = (id) => {
-    setProductoEliminando(id); // 🧼 Marcamos cuál se está eliminando
+    setProductoEliminando(id);
 
     setTimeout(async () => {
       await deleteDoc(doc(db, "productos", id));
-      setProductoEliminando(null); // 🔁 Limpiamos el estado después
-    }, 400); // ⏳ Esperamos 400ms para que la animación se vea
+      setProductoEliminando(null);
+    }, 400);
   };
 
-  // 🧽 Limpiar historial completo del usuario
   const limpiarHistorial = async () => {
     const confirmacion = window.confirm(
       "¿Estás seguro de que querés borrar todo el historial? Esta acción no se puede deshacer."
     );
     if (!confirmacion) return;
 
-    // 🔁 Activamos animación primero
+    const listaId = localStorage.getItem("listaId");
+
     setHistorialBorrando(true);
     setTimeout(async () => {
       const q = query(
         collection(db, "historial"),
-        where("uid", "==", usuario.uid)
+        where("listaId", "==", listaId)
       );
       const docs = await getDocs(q);
       const promesas = docs.docs.map((docu) =>
@@ -225,7 +227,7 @@ function App() {
       await Promise.all(promesas);
       mostrarAlerta("Historial limpiado 🧽", "success");
       setHistorialBorrando(false);
-    }, 300); // tiempo que dura la animación
+    }, 300);
   };
 
   const guardarEnHistorial = async (producto) => {
@@ -246,6 +248,7 @@ function App() {
 
   const logout = async () => {
     await signOut(auth);
+    navigate("/"); // ✅ redirige a la landing
   };
 
   const mostrarAlerta = (mensaje, tipo = "success") => {
@@ -255,7 +258,7 @@ function App() {
     }, 3000);
   };
 
-  const copiarEnlace = (uid) => {
+  const copiarEnlace = () => {
     const listaId = localStorage.getItem("listaId");
     const enlace = `${window.location.origin}/lista/${listaId}`;
     navigator.clipboard.writeText(enlace);
@@ -263,7 +266,7 @@ function App() {
   };
 
   return (
-    <div>
+    <div className="app-container">
       <h1>Lista Compartida de Compras 🛒</h1>
 
       {alerta && (
@@ -271,57 +274,70 @@ function App() {
       )}
 
       {!usuario ? (
-        <button onClick={login}>Iniciar sesión con Google</button>
+        <button className="primario" onClick={login}>
+          Iniciar sesión con Google
+        </button>
       ) : (
         <>
-          <p>Bienvenido, {usuario.displayName}</p>
-
-          <div
-            style={{
-              marginTop: "10px",
-              display: "flex",
-              gap: "10px",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <button onClick={toggleTema}>
-              Cambiar a modo {temaOscuro ? "claro ☀️" : "oscuro 🌙"}
-            </button>
-
-            <button onClick={logout}>Cerrar sesión</button>
+          <div className="seccion bienvenida">
+            <p
+              style={{
+                fontSize: "18px",
+                marginBottom: "10px",
+                fontStyle: "italic",
+              }}
+            >
+              Hola, {usuario.displayName || usuario.email}
+            </p>
           </div>
 
-          <p style={{ marginTop: "10px", fontWeight: "bold" }}>
-            🧾 Tienes {productos.filter((p) => !p.comprado).length} pendiente(s)
-            y {productos.filter((p) => p.comprado).length} comprado(s)
-          </p>
+          <div className="seccion">
+            <button className="secundario" onClick={toggleTema}>
+              Cambiar a modo {temaOscuro ? "claro ☀️" : "oscuro 🌙"}
+            </button>
+            <button className="logout" onClick={logout}>
+              Cerrar sesión
+            </button>
+          </div>
 
-          <p style={{ marginTop: "10px" }}>
-            <button onClick={() => copiarEnlace(usuario.uid)}>
+          <div className="seccion">
+            <p style={{ fontWeight: "bold" }}>
+              🧾 Tienes {productos.filter((p) => !p.comprado).length}{" "}
+              pendiente(s) y {productos.filter((p) => p.comprado).length}{" "}
+              comprado(s)
+            </p>
+            <button className="secundario" onClick={copiarEnlace}>
               Compartir mi lista 🔗
             </button>
-          </p>
+          </div>
 
-          <form onSubmit={agregarProducto}>
-            <input
-              type="text"
-              placeholder="Escribe un producto"
-              value={nuevoProducto}
-              onChange={(e) => setNuevoProducto(e.target.value)}
-            />
-            {errorInput && (
-              <p style={{ color: "red", fontSize: "14px", margin: "5px 0" }}>
-                {errorInput}
-              </p>
-            )}
-
-            <button type="submit">Agregar</button>
-          </form>
+          <div className="seccion">
+            <form onSubmit={agregarProducto}>
+              <input
+                type="text"
+                placeholder="Escribe un producto"
+                value={nuevoProducto}
+                onChange={(e) => setNuevoProducto(e.target.value)}
+              />
+              <button type="submit" className="primario">
+                Agregar
+              </button>
+              {errorInput && (
+                <p style={{ color: "red", fontSize: "14px", margin: "5px 0" }}>
+                  {errorInput}
+                </p>
+              )}
+            </form>
+          </div>
 
           <ul>
             {productos.map((producto) => (
-              <li key={producto.id}>
+              <li
+                key={producto.id}
+                className={`nuevo ${
+                  productoEliminando === producto.id ? "eliminando" : ""
+                }`}
+              >
                 {producto.nombre} {producto.comprado ? "✅" : ""}
                 <div style={{ display: "flex", gap: "5px", marginTop: "5px" }}>
                   <button
@@ -343,50 +359,79 @@ function App() {
             ))}
           </ul>
 
-          <h2 style={{ marginTop: "30px" }}>
-            🕓 Historial de productos tachados
-          </h2>
-          <ul>
-            {historial.map((item) => (
-              <li
-                key={item.id}
-                className={`historial-item ${
-                  historialBorrando ? "eliminando" : ""
-                }`}
-              >
-                {item.nombre} –{" "}
-                <span style={{ fontSize: "0.9em", color: "#666" }}>
-                  {new Date(item.timestamp?.seconds * 1000).toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {historial.length === 0 && (
-            <p
-              style={{ color: "#888", fontStyle: "italic", marginTop: "10px" }}
-            >
-              El historial está vacío 💤
-            </p>
-          )}
+          <div className="seccion historial">
+            <h2 style={{ marginTop: "30px", fontSize: "20px" }}>
+              Historial de productos tachados
+            </h2>
+            <ul>
+              {historial.map((item) => (
+                <li
+                  key={item.id}
+                  className={`historial-item ${
+                    historialBorrando ? "eliminando" : ""
+                  }`}
+                >
+                  {item.nombre} –{" "}
+                  <span style={{ fontSize: "0.9em", color: "#666" }}>
+                    {new Date(item.timestamp?.seconds * 1000).toLocaleString()}
+                  </span>
+                  <button
+                    onClick={() => eliminarHistorialItem(item.id)}
+                    className="boton-colab"
+                    style={{ marginLeft: "10px" }}
+                  >
+                    Eliminar 🗑️
+                  </button>
+                </li>
+              ))}
+            </ul>
 
-          {historial.length > 0 && (
-            <button onClick={limpiarHistorial} style={{ marginTop: "10px" }}>
-              Limpiar historial 🧽
-            </button>
-          )}
+            {historial.length === 0 && (
+              <p
+                style={{
+                  color: "#888",
+                  fontStyle: "italic",
+                  marginTop: "10px",
+                }}
+              >
+                El historial está vacío 💤
+              </p>
+            )}
+            {historial.length > 0 && (
+              <button
+                className="secundario"
+                onClick={limpiarHistorial}
+                style={{ marginTop: "10px" }}
+              >
+                Limpiar historial 🧽
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>
   );
 }
 
-// -------------------- COMPONENTE LISTA COMPARTIDA --------------------
+// -------------------- ListaCompartida --------------------
+
 function ListaCompartida() {
-  const { uid } = useParams(); // uid = listaId
+  const { uid } = useParams();
   const [productos, setProductos] = useState([]);
   const [nuevoProducto, setNuevoProducto] = useState("");
   const [productoEliminando, setProductoEliminando] = useState(null);
   const [alerta, setAlerta] = useState(null);
+  const [historial, setHistorial] = useState([]); // ✅ 1️⃣ Nuevo estado para el historial
+  const [historialBorrandoId, setHistorialBorrandoId] = useState(null);
+
+
+  useEffect(() => {
+    if (alerta) {
+      const timeout = setTimeout(() => setAlerta(null), 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [alerta]);
+  
 
   useEffect(() => {
     if (!uid) return;
@@ -397,11 +442,35 @@ function ListaCompartida() {
         id: doc.id,
         ...doc.data(),
       }));
-      setProductos(lista);
+      setProductos(lista.reverse());
     });
 
     return () => unsub();
   }, [uid]);
+
+  useEffect(() => {
+    if (!uid) return;
+
+    const q = query(collection(db, "historial"), where("listaId", "==", uid));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const lista = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      lista.sort((a, b) => b.timestamp?.seconds - a.timestamp?.seconds);
+      setHistorial(lista);
+    });
+
+    return () => unsub();
+  }, [uid]); // ✅ 1️⃣ useEffect para escuchar historial
+
+  const eliminarItemHistorial = async (id) => {
+    setHistorialBorrandoId(id);
+    setTimeout(async () => {
+      await deleteDoc(doc(db, "historial", id));
+      setHistorialBorrandoId(null);
+    }, 400);
+  };
 
   const agregarProducto = async (e) => {
     e.preventDefault();
@@ -417,7 +486,7 @@ function ListaCompartida() {
       (p) => p.nombre.trim().toLowerCase() === nombreMinuscula
     );
     if (yaExiste) {
-      setAlerta({ mensaje: "Ya existe ese producto", tipo: "error" });
+      setAlerta({ mensaje: "Ese producto ya está en la lista.", tipo: "error" });
       return;
     }
 
@@ -438,6 +507,13 @@ function ListaCompartida() {
     await updateDoc(ref, {
       comprado: !estadoActual,
     });
+
+    if (!estadoActual) {
+      const producto = productos.find((p) => p.id === id);
+      if (producto) {
+        await guardarEnHistorial(producto);
+      }
+    }
   };
 
   const eliminarProducto = (id) => {
@@ -447,6 +523,14 @@ function ListaCompartida() {
       await deleteDoc(doc(db, "productos", id));
       setProductoEliminando(null);
     }, 400);
+  };
+
+  const guardarEnHistorial = async (producto) => {
+    await addDoc(collection(db, "historial"), {
+      nombre: producto.nombre,
+      listaId: producto.listaId,
+      timestamp: new Date(),
+    });
   };
 
   return (
@@ -469,39 +553,85 @@ function ListaCompartida() {
 
       <ul>
         {productos.map((producto) => (
-          <Producto
+          <li
             key={producto.id}
-            nombre={producto.nombre}
-            comprado={producto.comprado}
-            onClick={() =>
-              marcarComoComprado(producto.id, producto.comprado)
-            }
-            onDelete={() => eliminarProducto(producto.id)}
-            claseExtra={`nuevo ${
+            className={`nuevo ${
               productoEliminando === producto.id ? "eliminando" : ""
             }`}
-          />
+          >
+            {producto.nombre} {producto.comprado ? "✅" : ""}
+            <div style={{ display: "flex", gap: "5px", marginTop: "5px" }}>
+              <button
+                className="boton-colab"
+                onClick={() =>
+                  marcarComoComprado(producto.id, producto.comprado)
+                }
+              >
+                {producto.comprado ? "Desmarcar" : "Marcar"}
+              </button>
+              <button
+                className="boton-colab"
+                onClick={() => eliminarProducto(producto.id)}
+              >
+                Eliminar
+              </button>
+            </div>
+          </li>
         ))}
       </ul>
+
+      {/* ✅ 2️⃣ Mostrar historial */}
+      <div className="seccion historial">
+        <h2 style={{ marginTop: "30px", fontSize: "20px" }}>
+          Historial de productos tachados
+        </h2>
+
+        <ul>
+          {historial.map((item) => (
+            <li
+              key={item.id}
+              className={`historial-item ${
+                historialBorrandoId === item.id ? "eliminando" : ""
+              }`}
+            >
+              {item.nombre} –{" "}
+              <span style={{ fontSize: "0.9em", color: "#666" }}>
+                {new Date(item.timestamp?.seconds * 1000).toLocaleString()}
+              </span>
+              <button
+                className="boton-colab"
+                onClick={() => eliminarItemHistorial(item.id)}
+                style={{ marginLeft: "10px" }}
+              >
+                🗑️
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {historial.length === 0 && (
+          <p style={{ color: "#888", fontStyle: "italic", marginTop: "10px" }}>
+            El historial está vacío 💤
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-
-// -------------------- MAIN APP (rutas) --------------------
-
+// -------------------- MAIN ROUTER --------------------
 
 function MainApp() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />        {/* Nueva landing */}
-        <Route path="/app" element={<App />} />             {/* App con login */}
-        <Route path="/lista/:uid" element={<ListaCompartida />} /> {/* Vista colaborativa */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/app" element={<App />} />
+        <Route path="/lista/:uid" element={<ListaCompartida />} />
+        <Route path="/login-email" element={<LoginEmail />} />
       </Routes>
     </Router>
   );
 }
-
 
 export default MainApp;

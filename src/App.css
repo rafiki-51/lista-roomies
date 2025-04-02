@@ -1,14 +1,40 @@
 body {
   background-color: #f1f5f9;
-  font-family: Arial, sans-serif;
+  font-family: "Segoe UI", Arial, sans-serif;
   margin: 0;
   padding: 0;
+  text-align: center;
+  color: #1f2937;
+}
+
+.app-container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 20px;
   text-align: center;
 }
 
 h1 {
-  margin-top: 30px;
-  color: #1f2937;
+  font-size: 28px;
+  margin-bottom: 20px;
+  color: #111827;
+}
+
+.seccion {
+  margin: 25px 0;
+  padding: 10px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.seccion:first-of-type {
+  border-top: none;
+}
+
+.bienvenida p {
+  font-size: 1rem;
+  font-style: italic;
+  color: #64748b;
+  margin: 0;
 }
 
 form {
@@ -42,6 +68,34 @@ button:hover {
   background-color: #059669;
 }
 
+button.primario {
+  background-color: #10b981;
+  color: white;
+}
+
+button.primario:hover {
+  background-color: #059669;
+}
+
+button.secundario {
+  background-color: transparent;
+  border: 2px solid #10b981;
+  color: #10b981;
+}
+
+button.secundario:hover {
+  background-color: #d1fae5;
+}
+
+button.logout {
+  background-color: #f87171;
+  color: white;
+}
+
+button.logout:hover {
+  background-color: #ef4444;
+}
+
 ul {
   list-style: none;
   padding: 0;
@@ -59,38 +113,75 @@ li {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  transition: all 0.3s ease;
 }
 
-/* Tema oscuro */
 .tema-oscuro {
   background-color: #1e293b;
   color: #f1f5f9;
 }
 
+/* Input */
 .tema-oscuro input[type="text"] {
   background-color: #334155;
   color: #f1f5f9;
   border: 1px solid #475569;
 }
 
+/* Lista */
 .tema-oscuro li {
   background-color: #334155;
   color: #f1f5f9;
 }
 
+/* Botones generales */
 .tema-oscuro button {
   background-color: #0ea5e9;
+  color: white;
 }
 
+/* Hover general */
 .tema-oscuro button:hover {
   background-color: #0284c7;
 }
 
+/* Título */
 .tema-oscuro h1 {
   color: #f1f5f9;
 }
 
-/* Alertas */
+/* ✅ Botones secundarios (outlined) */
+.tema-oscuro .secundario {
+  background-color: transparent;
+  border: 2px solid #38bdf8;
+  color: #38bdf8;
+}
+
+.tema-oscuro .secundario:hover {
+  background-color: #1e3a8a;
+  color: white;
+}
+
+/* ✅ Botón de logout */
+.tema-oscuro .logout {
+  background-color: #ef4444;
+  color: white;
+}
+
+.tema-oscuro .logout:hover {
+  background-color: #dc2626;
+}
+
+.tema-oscuro button {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.tema-oscuro button:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.6);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
 .alerta {
   position: fixed;
   top: 20px;
@@ -100,8 +191,15 @@ li {
   border-radius: 6px;
   font-weight: bold;
   z-index: 1000;
-  animation: fadeInOut 3s ease;
+  opacity: 1;
+  transition: opacity 0.6s ease;
 }
+
+.alerta.oculta {
+  opacity: 0;
+  pointer-events: none;
+}
+
 
 .alerta.success {
   background-color: #22c55e;
@@ -120,7 +218,44 @@ li {
   100% { opacity: 0; }
 }
 
-/* 📱 Estilos Responsive */
+li.nuevo {
+  animation: aparecer 0.4s ease;
+}
+
+@keyframes aparecer {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+li.comprado {
+  text-decoration: line-through;
+  color: gray;
+  transition: color 0.3s ease, text-decoration 0.3s ease;
+}
+
+li.eliminando {
+  opacity: 0;
+  transform: translateX(50px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.historial-item {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 0.3s ease-in-out;
+}
+
+.historial-item.eliminando {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
 @media (max-width: 600px) {
   h1 {
     font-size: 22px;
@@ -130,6 +265,7 @@ li {
   form {
     flex-direction: column;
     align-items: center;
+    gap: 12px;
   }
 
   input[type="text"],
@@ -151,95 +287,9 @@ li {
     width: 90%;
     font-size: 14px;
   }
-}
 
-/* ✨ Animaciones suaves */
-li {
-  transition: all 0.3s ease;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Entrada animada */
-li.nuevo {
-  animation: aparecer 0.4s ease;
-}
-
-@keyframes aparecer {
-  0% {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Tachado suave */
-li.comprado {
-  text-decoration: line-through;
-  color: gray;
-  transition: color 0.3s ease, text-decoration 0.3s ease;
-}
-
-li.eliminando {
-  opacity: 0;
-  transform: translateX(50px);
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-
-/* ✨ Animación para historial */
-.historial-item {
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.3s ease-in-out;
-}
-
-.historial-item.eliminando {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-@media (max-width: 480px) {
-  h1 {
-    font-size: 20px;
-  }
-
-  input[type="text"] {
-    width: 100%;
-    font-size: 18px;
-  }
-
-  button {
-    width: 100%;
-    font-size: 18px;
-    padding: 12px;
-    margin-top: 10px;
-  }
-
-  ul {
-    max-width: 90%;
-  }
-
-  li {
-    font-size: 16px;
-    padding: 14px;
-  }
-
-  .alerta {
-    font-size: 14px;
-    padding: 10px 15px;
-  }
-}
-
-@media (max-width: 600px) {
   body {
     padding: 10px;
-  }
-
-  h1 {
-    font-size: 1.5rem;
   }
 
   input[type="text"] {
@@ -261,11 +311,6 @@ li.eliminando {
   .alerta {
     font-size: 16px;
     padding: 14px 20px;
-  }
-
-  form {
-    flex-direction: column;
-    gap: 12px;
   }
 }
 
@@ -293,3 +338,16 @@ li.eliminando {
   }
 }
 
+.historial-item {
+  background-color: #fff;
+  padding: 10px;
+  margin: 5px auto;
+  border-radius: 6px;
+  max-width: 400px;
+  text-align: left;
+  font-size: 15px;
+}
+.tema-oscuro .historial-item {
+  background-color: #334155;
+  color: #f1f5f9;
+}
